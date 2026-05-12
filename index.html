@@ -1,9 +1,143 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta http-equiv="refresh" content="0; url=sample_report.html">
-</head>
-<body>
-    <p>Redirecting to <a href="sample_report.html">sample_report.html</a>...</p>
-</body>
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI 爆款内容分析系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand__title">AI 爆款内容分析系统</div>
+          <div class="brand__sub">点击任意话题，查看AI生成的选题建议</div>
+        </div>
+        <div class="metaTag">全部数据前端预设 · 秒切换</div>
+      </header>
+
+      <main class="content">
+        <section class="topics card">
+          <div class="topics__header">
+            <h2>热门话题</h2>
+            <div class="muted">选择一个话题，右侧立即切换到对应的专业分析。</div>
+          </div>
+
+          <div class="topicGroups">
+            <div class="topicGroup">
+              <div class="topicGroup__title">分类1 · 生活健身类</div>
+              <div class="topicGroup__buttons" id="group-life"></div>
+            </div>
+            <div class="topicGroup">
+              <div class="topicGroup__title">分类2 · 职场成长类</div>
+              <div class="topicGroup__buttons" id="group-career"></div>
+            </div>
+            <div class="topicGroup">
+              <div class="topicGroup__title">分类3 · 内容创作类</div>
+              <div class="topicGroup__buttons" id="group-content"></div>
+            </div>
+            <div class="topicGroup">
+              <div class="topicGroup__title">分类4 · 热门趋势类</div>
+              <div class="topicGroup__buttons" id="group-trend"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="dashboard" id="dashboard">
+          <div class="kpiGrid">
+            <div class="kpi card">
+              <div class="kpi__label">样本量</div>
+              <div class="kpi__value" id="kpiN">-</div>
+            </div>
+            <div class="kpi card">
+              <div class="kpi__label">标题字符中位数</div>
+              <div class="kpi__value" id="kpiCharMed">-</div>
+            </div>
+            <div class="kpi card">
+              <div class="kpi__label">标题词数中位数</div>
+              <div class="kpi__value" id="kpiWordMed">-</div>
+            </div>
+            <div class="kpi card">
+              <div class="kpi__label">推荐内容结构</div>
+              <div class="kpi__value small" id="kpiStructure">-</div>
+            </div>
+          </div>
+
+          <div class="grid">
+            <section class="card wide">
+              <h3>规律总结</h3>
+              <ul class="bullets" id="summaryList"></ul>
+            </section>
+
+            <section class="card wide">
+              <h3>5 个可直接开拍/开写的选题</h3>
+              <ol class="ideas" id="ideaList"></ol>
+            </section>
+
+            <section class="card wide">
+              <h3>Hook 模板（标题/开头 3 秒）</h3>
+              <div class="hookGrid" id="hookList"></div>
+              <p class="muted">用法：选一个 Hook + 选一个选题 + 套入你的目标人群/场景，即可快速产出。</p>
+            </section>
+
+            <section class="card">
+              <h3>情绪分布（预设）</h3>
+              <canvas id="chartSent"></canvas>
+              <p class="muted">说明：此图用于内容基调参考（理性/兴奋/焦虑）。</p>
+            </section>
+            <section class="card">
+              <h3>标题钩子结构</h3>
+              <canvas id="chartHooks"></canvas>
+              <p class="muted">钩子结构可直接转成“标题模板”，做 A/B 测试。</p>
+            </section>
+
+            <section class="card">
+              <h3>标题长度分布（字符）</h3>
+              <canvas id="chartLenChar"></canvas>
+              <p class="muted">围绕中位数附近做“短/长两档”测试，找到最优信息密度。</p>
+            </section>
+            <section class="card">
+              <h3>标题长度分布（词数）</h3>
+              <canvas id="chartLenWord"></canvas>
+              <p class="muted">更适合英文；中文主要参考字符数分布。</p>
+            </section>
+
+            <section class="card wide">
+              <h3>Top 关键词（1-2gram）</h3>
+              <canvas id="chartTerms"></canvas>
+              <p class="muted">把高频二元词组当“标题骨架”，再补场景/案例/对比维度。</p>
+            </section>
+
+            <section class="card wide">
+              <h3>样本标题（Top 20）</h3>
+              <div class="tableWrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width: 62%">标题</th>
+                      <th style="width: 18%">热度(模拟)</th>
+                      <th style="width: 20%">标签</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sampleTable"></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div class="muted">
+          提示：本页面所有数据均为前端预设，用于秒切换展示与内容生产参考。
+        </div>
+      </footer>
+    </div>
+
+    <div class="toast" id="toast" hidden></div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
 </html>
+
