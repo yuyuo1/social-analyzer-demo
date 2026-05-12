@@ -18,6 +18,25 @@
       </header>
 
       <main class="content">
+        <section class="upload card">
+          <div class="upload__header">
+            <h2>上传你的 CSV（本地解析）</h2>
+            <div class="muted">支持 Google Trends 导出等 CSV。选择“包含标题/查询词”的那一列即可分析。</div>
+          </div>
+          <div class="uploadRow">
+            <input id="csvFile" class="fileInput" type="file" accept=".csv,text/csv" />
+            <div class="uploadMeta" id="csvInfo">未选择文件</div>
+          </div>
+          <div class="uploadRow">
+            <label class="selectField">
+              <span>标题列</span>
+              <select id="csvColumn" disabled></select>
+            </label>
+            <button id="applyCsvBtn" class="applyBtn" type="button" disabled>用该 CSV 生成分析</button>
+          </div>
+          <div class="muted">提示：文件只在浏览器本地读取，不会上传到任何服务器。</div>
+        </section>
+
         <section class="topics card">
           <div class="topics__header">
             <h2>热门话题</h2>

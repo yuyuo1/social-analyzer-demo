@@ -2,6 +2,10 @@ const $ = (id) => /** @type {HTMLElement} */ (document.getElementById(id));
 
 const els = {
   toast: $("toast"),
+  csvFile: /** @type {HTMLInputElement} */ ($("csvFile")),
+  csvInfo: $("csvInfo"),
+  csvColumn: /** @type {HTMLSelectElement} */ ($("csvColumn")),
+  applyCsvBtn: /** @type {HTMLButtonElement} */ ($("applyCsvBtn")),
   groupLife: $("group-life"),
   groupCareer: $("group-career"),
   groupContent: $("group-content"),
@@ -28,6 +32,244 @@ function showToast(message) {
 
 function escapeHtml(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function clamp(x, a, b) {
+  return Math.max(a, Math.min(b, x));
+}
+
+function median(nums) {
+  if (!nums.length) return 0;
+  const s = [...nums].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+function tokenize(text) {
+  const t = String(text)
+    .toLowerCase()
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/[@#]\w+/g, " ");
+  const m = t.match(/[a-z0-9\u4e00-\u9fa5]+/g);
+  return (m || []).filter((x) => x.length >= 2);
+}
+
+function ngrams(tokens, n) {
+  const out = [];
+  for (let i = 0; i + n <= tokens.length; i++) out.push(tokens.slice(i, i + n).join(" "));
+  return out;
+}
+
+function histogram(values, binSize) {
+  if (!values.length) return { labels: [], counts: [] };
+  const vmin = Math.min(...values);
+  const vmax = Math.max(...values);
+  const start = Math.floor(vmin / binSize) * binSize;
+  const end = (Math.floor(vmax / binSize) + 1) * binSize;
+  const bins = [];
+  for (let b = start; b <= end; b += binSize) bins.push(b);
+  const counts = new Array(Math.max(1, bins.length - 1)).fill(0);
+  const width = bins.length >= 2 ? bins[1] - bins[0] : binSize;
+  for (const v of values) {
+    const idx = clamp(Math.floor((v - bins[0]) / width), 0, counts.length - 1);
+    counts[idx] += 1;
+  }
+  const labels = counts.map((_, i) => `${bins[i]}–${bins[i + 1] - 1}`);
+  return { labels, counts };
+}
+
+const SENT_POS = new Set(["best", "amazing", "great", "easy", "wins", "win", "improve", "boost", "fast", "save", "pro", "premium", "成功", "提升", "高效", "省钱", "爆", "爽", "提升", "稳赢"]);
+const SENT_NEG = new Set(["fail", "fails", "bad", "worst", "slow", "broken", "mistake", "scam", "avoid", "坑", "踩坑", "翻车", "糟糕", "失败", "崩", "焦虑"]);
+
+function sentimentLabel(title) {
+  const toks = tokenize(title);
+  let score = 0;
+  for (const w of toks) {
+    if (SENT_POS.has(w)) score += 1;
+    if (SENT_NEG.has(w)) score -= 1;
+  }
+  if (score >= 1) return "positive";
+  if (score <= -1) return "negative";
+  return "neutral";
+}
+
+function hookCounts(titles) {
+  const rx = {
+    question_mark: /[?？]\s*$/,
+    listicle: /\b(\d+)\s+(ways|tips|reasons|ideas|lessons)\b/i,
+    how_to: /\bhow to\b/i,
+    vs: /\bvs\.?\b/i,
+    brackets: /[\[\(【（].+[\]\)】）]/,
+    colon: /[:：]/,
+    quoted: /“|”|".+?"/,
+  };
+  const counts = Object.fromEntries(Object.keys(rx).map((k) => [k, 0]));
+  for (const t of titles) for (const [k, r] of Object.entries(rx)) if (r.test(t)) counts[k] += 1;
+  return counts;
+}
+
+function parseCSV(text) {
+  const src = String(text || "");
+  const sample = src.slice(0, 2000);
+  const delim = sample.includes("\t") && !sample.includes(",") ? "\t" : sample.includes(";") && !sample.includes(",") ? ";" : ",";
+
+  /** @type {string[][]} */
+  const rows = [];
+  let cur = "";
+  let inQuotes = false;
+  /** @type {string[]} */
+  let row = [];
+
+  function pushCell() {
+    row.push(cur);
+    cur = "";
+  }
+  function pushRow() {
+    // trim only surrounding whitespace; keep inner spaces
+    const r = row.map((c) => c.replace(/^\uFEFF/, "").trim());
+    if (r.some((x) => x.length)) rows.push(r);
+    row = [];
+  }
+
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        const next = src[i + 1];
+        if (next === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        cur += ch;
+      }
+    } else {
+      if (ch === '"') {
+        inQuotes = true;
+      } else if (ch === delim) {
+        pushCell();
+      } else if (ch === "\n") {
+        pushCell();
+        pushRow();
+      } else if (ch === "\r") {
+        // ignore
+      } else {
+        cur += ch;
+      }
+    }
+  }
+  pushCell();
+  pushRow();
+
+  if (!rows.length) return { headers: [], records: [] };
+  const headers = rows[0];
+  const records = rows.slice(1);
+  return { headers, records };
+}
+
+function buildTopicFromTitles(name, titles) {
+  const clean = titles.map((t) => String(t || "").trim()).filter((t) => t.length >= 2);
+  const n = clean.length;
+  const charLens = clean.map((t) => t.length);
+  const wordLens = clean.map((t) => (t.trim() ? t.trim().split(/\s+/).length : 0));
+
+  const sent = { pos: 0, neu: 0, neg: 0 };
+  for (const t of clean) {
+    const lab = sentimentLabel(t);
+    if (lab === "positive") sent.pos += 1;
+    else if (lab === "negative") sent.neg += 1;
+    else sent.neu += 1;
+  }
+
+  const hooks = hookCounts(clean);
+
+  const freq = new Map();
+  for (const t of clean) {
+    const toks = tokenize(t);
+    for (const g of [...ngrams(toks, 1), ...ngrams(toks, 2)]) {
+      freq.set(g, (freq.get(g) || 0) + 1);
+    }
+  }
+  const top = [...freq.entries()]
+    .filter(([k]) => k.length >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+
+  const charHist = histogram(charLens, 6);
+  const wordHist = histogram(wordLens, 2);
+
+  const topTerms = { labels: top.map((x) => x[0]), counts: top.map((x) => x[1]) };
+
+  const colonRate = n ? Math.round((hooks.colon / n) * 100) : 0;
+  const listRate = n ? Math.round((hooks.listicle / n) * 100) : 0;
+  const qRate = n ? Math.round((hooks.question_mark / n) * 100) : 0;
+  const vsRate = n ? Math.round((hooks.vs / n) * 100) : 0;
+  const howRate = n ? Math.round((hooks.how_to / n) * 100) : 0;
+
+  const structure = [
+    listRate >= 12 ? "数字清单" : null,
+    vsRate >= 8 ? "对比" : null,
+    howRate >= 8 ? "How-to" : null,
+    colonRate >= 12 ? "冒号拆分" : null,
+    qRate >= 8 ? "提问" : null,
+  ]
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(" + ") || "清晰对象 + 具体收益 + 可执行步骤";
+
+  const medChar = Math.round(median(charLens));
+  const medWord = Math.round(median(wordLens));
+
+  const term1 = topTerms.labels[0] || "这个主题";
+  const term2 = topTerms.labels[1] || "核心方法";
+  const term3 = topTerms.labels[2] || "避坑";
+
+  const summary = [
+    `标题长度中位数约为 ${medChar} 字（词数中位数 ${medWord}），建议围绕中位数上下做“短/长两档”A/B。`,
+    `钩子结构占比（大致）：冒号 ${colonRate}% · 清单 ${listRate}% · 提问 ${qRate}% · 对比 ${vsRate}% · How-to ${howRate}%。优先沿高占比结构做系列。`,
+    `主题词集中在「${term1}」「${term2}」「${term3}」等，建议用“二元词组”作为标题骨架，再填入人群/场景/结果指标。`,
+    `情绪基调：正/中/负 ≈ ${sent.pos}/${sent.neu}/${sent.neg}。如果你做的是增长向内容，可适当提高“正向收益承诺”与“对比证据”。`,
+  ];
+
+  const ideas = [
+    `《${term1}：从 0 到 1 的最小闭环（附清单/模板）》`,
+    `《${term1} vs ${term2}：同一目标两种做法对比，差别在这 3 点》`,
+    `《别再做 ${term3}：这 5 个坑会让你越做越差（替代方案）》`,
+    `《${term1} 的 7 条高频问题一次讲清（适合新手/上班族）》`,
+    `《真实案例复盘：用 ${term1} 做到 ___ 的关键动作与时间线》`,
+  ];
+
+  const hookTemplates = [
+    { title: "对比证据", text: `同一目标我用「${term1}」和「${term2}」各做了一次，对比结果差距很明显。` },
+    { title: "反常识纠偏", text: `你以为 ${term1} 的关键是 ___？其实真正影响结果的是这一步。` },
+    { title: "清单交付", text: `我把「${term1}」拆成一张清单：照着做就能复刻结果。` },
+    { title: "避坑预警", text: `最容易翻车的是「${term3}」：先按这 3 条规则排雷。` },
+    { title: "限定人群", text: `如果你是【___人群】，用 ${term1} 最稳的切入点是 ___（不走弯路）。` },
+  ];
+
+  const sampleTitles = clean.slice(0, 20).map((t, i) => ({
+    title: t,
+    score: 1200 - i * 23,
+    tag: hooks.colon ? "结构" : "样本",
+  }));
+
+  return {
+    name,
+    kpis: { n, charMedian: medChar, wordMedian: medWord, structure },
+    summary,
+    ideas,
+    hooks: hookTemplates,
+    sampleTitles,
+    charts: {
+      sent,
+      hooks,
+      lenChar: charHist,
+      lenWord: wordHist,
+      terms: topTerms,
+    },
+  };
 }
 
 function chartGradient(ctx, area, c1, c2) {
@@ -966,6 +1208,67 @@ addTopicButtons(els.groupCareer, TOPIC_GROUPS.career);
 addTopicButtons(els.groupContent, TOPIC_GROUPS.content);
 addTopicButtons(els.groupTrend, TOPIC_GROUPS.trend);
 bindButtons();
+
+// --- CSV 上传：本地读取并替换当前示例数据 ---
+let lastCsv = { headers: [], records: [], fileName: "" };
+
+function setColumnOptions(headers) {
+  els.csvColumn.innerHTML = "";
+  headers.forEach((h, idx) => {
+    const opt = document.createElement("option");
+    opt.value = String(idx);
+    opt.textContent = h || `第 ${idx + 1} 列`;
+    els.csvColumn.appendChild(opt);
+  });
+
+  // Guess a likely title/query column
+  const lower = headers.map((h) => String(h || "").toLowerCase());
+  const candidates = ["title", "标题", "query", "queries", "keyword", "keywords", "term", "topic", "search term", "搜索词", "搜索字词"];
+  let pick = 0;
+  for (let i = 0; i < lower.length; i++) {
+    if (candidates.some((c) => lower[i].includes(String(c).toLowerCase()))) {
+      pick = i;
+      break;
+    }
+  }
+  els.csvColumn.value = String(pick);
+}
+
+els.csvFile.addEventListener("change", async () => {
+  const f = els.csvFile.files && els.csvFile.files[0];
+  if (!f) return;
+  els.csvInfo.textContent = `已选择：${f.name}（${Math.round(f.size / 1024)} KB）`;
+  const text = await f.text();
+  const parsed = parseCSV(text);
+  if (!parsed.headers.length || !parsed.records.length) {
+    showToast("CSV 解析失败或没有数据行，请检查格式。");
+    els.csvColumn.disabled = true;
+    els.applyCsvBtn.disabled = true;
+    return;
+  }
+  lastCsv = { ...parsed, fileName: f.name };
+  setColumnOptions(parsed.headers);
+  els.csvColumn.disabled = false;
+  els.applyCsvBtn.disabled = false;
+  showToast("CSV 已读取：请选择标题列并应用。");
+});
+
+els.applyCsvBtn.addEventListener("click", () => {
+  if (!lastCsv.records.length) return;
+  const col = Number(els.csvColumn.value || 0);
+  const titles = lastCsv.records.map((r) => (r && r[col] != null ? String(r[col]) : "")).filter((x) => x && x.trim().length);
+  if (titles.length < 5) {
+    showToast("该列有效标题太少（<5）。请换一列再试。");
+    return;
+  }
+
+  const topic = buildTopicFromTitles(`自定义 CSV：${lastCsv.fileName}`, titles.slice(0, 300));
+  TOPIC_DATA.uploaded = topic;
+
+  // Render and highlight: create a synthetic active button state by clearing others.
+  renderTopic("uploaded");
+  showToast(`已用 CSV 分析：${titles.length} 条标题`);
+});
 
 // 默认选中：AI工具（符合“专业不敷衍”的示例）
 renderTopic("ai_tools");

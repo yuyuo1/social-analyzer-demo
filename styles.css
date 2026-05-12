@@ -79,6 +79,64 @@ body{
 }
 .muted{color: var(--muted); font-size:12px; line-height:1.7}
 
+.upload{
+  margin-top: 8px;
+  padding: 18px 18px 16px;
+}
+.upload__header{margin-bottom: 12px}
+.uploadRow{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
+.fileInput{
+  width: 320px;
+  max-width: 100%;
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(26,82,118,.18);
+  background: rgba(255,255,255,.72);
+  color: rgba(15,27,33,.86);
+  font-weight: 700;
+}
+.uploadMeta{
+  font-size: 12px;
+  color: rgba(15,27,33,.70);
+}
+.selectField{
+  display:grid;
+  gap:6px;
+  font-size:12px;
+  color: rgba(15,27,33,.72);
+  font-weight: 800;
+}
+.selectField select{
+  min-width: 260px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(26,82,118,.18);
+  background: rgba(255,255,255,.72);
+  color: rgba(15,27,33,.88);
+  outline: none;
+}
+.applyBtn{
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(26,82,118,.22);
+  background: linear-gradient(90deg, rgba(26,82,118,.98), rgba(46,134,193,.98));
+  color: rgba(255,255,255,.95);
+  font-weight: 900;
+  cursor: pointer;
+}
+.applyBtn:disabled{
+  opacity: .55;
+  cursor: not-allowed;
+}
+
 .topics{
   margin-top: 8px;
   padding: 18px 18px 16px;
